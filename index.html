@@ -463,9 +463,9 @@ button{user-select:none;cursor:pointer}
           <div class="sp-mini-note">ส่งสัญญาณคู่ขนานกับ Deriv — ไม่กระทบการเทรดบน Deriv เลย</div>
           <div class="sp-row"><label>RR Ratio</label><input type="number" id="mt5RrInput" value="2" min="0.1" step="0.1" style="max-width:70px" onchange="mt5RrChanged(this.value)"><span style="font-family:var(--mono);font-size:9px;color:var(--muted)">เช่น 2 = TP ไกลกว่า SL 2 เท่า</span></div>
           <div class="sp-row"><label>SL × ATR</label><input type="number" id="mt5SlAtrInput" value="1.5" min="0.1" step="0.1" style="max-width:70px" onchange="mt5SlAtrChanged(this.value)"><span style="font-family:var(--mono);font-size:9px;color:var(--muted)">ระยะ SL = ATR คูณค่านี้</span></div>
-          <div class="sp-row"><label>Lot Size</label><input type="number" id="mt5LotInput" value="0.01" min="0.01" step="0.01" style="max-width:70px" onchange="mt5LotChanged(this.value)"></div>
+          <div class="sp-row"><label>Lot เริ่มต้น</label><input type="number" id="mt5LotInput" value="0.01" min="0.01" step="0.01" style="max-width:70px" onchange="mt5LotChanged(this.value)"><span style="font-family:var(--mono);font-size:9px;color:var(--muted)">ใช้กรณีไม่ได้ตั้ง lot แยกต่อ symbol ด้านล่าง</span></div>
           <div class="sp-row"><label>API URL</label><input type="text" id="mt5ApiBaseInput" value="https://deriv-mt5signal.vercel.app" onchange="mt5ApiBaseUrlChanged(this.value)" style="min-width:220px"></div>
-          <div class="sp-section" style="margin-top:8px">แมป Symbol → ชื่อใน MT5</div>
+          <div class="sp-section" style="margin-top:8px">แมป Symbol → ชื่อใน MT5 + Lot ขั้นต่ำ</div>
           <div id="mt5SymbolMapList" style="font-family:var(--mono);font-size:9.5px"></div>
           <div class="sp-mini-note warn" style="margin-top:8px">ชื่อ Symbol ใน MT5 ต้องตรงกับที่เห็นใน Market Watch ของโบรกเกอร์คุณเป๊ะ (เช่น "Volatility 75 Index") ไม่งั้น EA จะเปิดออเดอร์ไม่ได้</div>
           <div class="sp-section" style="margin-top:8px">สถานะล่าสุด</div>
@@ -1445,6 +1445,7 @@ async function sendTodaySummaryNow(){await notifyTelegramDailySummary(todayKey()
    ══════════════════════════════════════════════════════ */
 let mt5Enabled=false,mt5RrRatio=2,mt5SlAtrMult=1.5,mt5LotSize=0.01;
 let mt5SymbolMap={};
+let mt5LotMap={};
 let mt5ApiBaseUrl='https://deriv-mt5signal.vercel.app';
 
 function loadMt5Config(){
@@ -1453,11 +1454,12 @@ function loadMt5Config(){
     mt5Enabled=!!cfg.enabled;mt5RrRatio=Number.isFinite(cfg.rr)?cfg.rr:2;
     mt5SlAtrMult=Number.isFinite(cfg.slAtr)?cfg.slAtr:1.5;mt5LotSize=Number.isFinite(cfg.lot)?cfg.lot:0.01;
     mt5SymbolMap=cfg.symbolMap||{};
+    mt5LotMap=cfg.lotMap||{};
     mt5ApiBaseUrl=cfg.apiBaseUrl||'https://deriv-mt5signal.vercel.app';
   }catch(e){}
 }
 function saveMt5Config(){
-  try{localStorage.setItem('v36Mt5Config',JSON.stringify({enabled:mt5Enabled,rr:mt5RrRatio,slAtr:mt5SlAtrMult,lot:mt5LotSize,symbolMap:mt5SymbolMap,apiBaseUrl:mt5ApiBaseUrl}));}catch(e){}
+  try{localStorage.setItem('v36Mt5Config',JSON.stringify({enabled:mt5Enabled,rr:mt5RrRatio,slAtr:mt5SlAtrMult,lot:mt5LotSize,symbolMap:mt5SymbolMap,lotMap:mt5LotMap,apiBaseUrl:mt5ApiBaseUrl}));}catch(e){}
 }
 function mt5ToggleEnabled(checked){
   mt5Enabled=checked;
@@ -1469,11 +1471,20 @@ function mt5SlAtrChanged(v){const n=parseFloat(v);if(Number.isFinite(n)&&n>0)mt5
 function mt5LotChanged(v){const n=parseFloat(v);if(Number.isFinite(n)&&n>0)mt5LotSize=n;saveMt5Config();}
 function mt5ApiBaseUrlChanged(v){mt5ApiBaseUrl=(v||'').trim().replace(/\/$/,'');saveMt5Config();}
 function mt5SymbolInputChanged(derivSym,val){mt5SymbolMap[derivSym]=val.trim();saveMt5Config();}
+function mt5LotInputChanged(derivSym,val){
+  const n=parseFloat(val);
+  if(Number.isFinite(n)&&n>0)mt5LotMap[derivSym]=n;else delete mt5LotMap[derivSym];
+  saveMt5Config();
+}
 function renderMt5SymbolMap(){
   const el=qs('mt5SymbolMapList');if(!el)return;
   el.innerHTML=apiWatchedSymbols.map(sym=>{
     const val=mt5SymbolMap[sym]||'';
-    return '<div class="sp-row"><label style="min-width:60px">'+escapeHtml(sym)+'</label><input type="text" value="'+escapeHtml(val)+'" placeholder="เช่น Volatility 75 Index" onchange="mt5SymbolInputChanged(\''+sym+'\',this.value)"></div>';
+    const lotVal=Number.isFinite(mt5LotMap[sym])?mt5LotMap[sym]:'';
+    return '<div class="sp-row"><label style="min-width:60px">'+escapeHtml(sym)+'</label>'+
+      '<input type="text" value="'+escapeHtml(val)+'" placeholder="เช่น Volatility 75 Index" style="flex:2;min-width:140px" onchange="mt5SymbolInputChanged(\''+sym+'\',this.value)">'+
+      '<input type="number" value="'+lotVal+'" placeholder="lot ขั้นต่ำ" min="0.01" step="0.01" style="max-width:80px" onchange="mt5LotInputChanged(\''+sym+'\',this.value)">'+
+      '</div>';
   }).join('')||'<div style="color:var(--muted)">ยังไม่มี symbol ใน Watchlist</div>';
 }
 function mt5InitUiFromConfig(){
@@ -1495,7 +1506,8 @@ async function sendSignalToMt5(derivSymbol,direction,entryPrice,atrValue){
   const isBuy=direction==='HIGHER';
   const sl=isBuy?(entryPrice-slDist):(entryPrice+slDist);
   const tp=isBuy?(entryPrice+slDist*mt5RrRatio):(entryPrice-slDist*mt5RrRatio);
-  const payload={side:isBuy?'BUY':'SELL',symbol:mt5Symbol,lot:mt5LotSize,sl:sl,tp:tp,strategy:derivSymbol+' RR'+mt5RrRatio};
+  const lotForSymbol=Number.isFinite(mt5LotMap[derivSymbol])?mt5LotMap[derivSymbol]:mt5LotSize;
+  const payload={side:isBuy?'BUY':'SELL',symbol:mt5Symbol,lot:lotForSymbol,sl:sl,tp:tp,strategy:derivSymbol+' RR'+mt5RrRatio};
   try{
     const res=await fetch(mt5ApiBaseUrl+'/api/orders',{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
