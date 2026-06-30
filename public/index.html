@@ -211,6 +211,21 @@ button{user-select:none;cursor:pointer}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+.acct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-bottom:8px}
+.acct-kpi{border:1px solid var(--border);border-radius:6px;padding:6px 8px;background:rgba(255,255,255,.02)}
+.acct-kpi label{display:block;font-family:var(--mono);font-size:7.5px;color:var(--muted);text-transform:uppercase}
+.acct-kpi span{display:block;font-family:var(--mono);font-size:13px;font-weight:800;margin-top:2px}
+.pos-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:9.5px}
+.pos-table th{text-align:left;color:var(--muted);font-size:8px;text-transform:uppercase;padding:4px 6px;border-bottom:1px solid var(--border)}
+.pos-table td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.04)}
+.strat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.strat-card{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:rgba(255,255,255,.02)}
+.strat-card .sc-name{font-family:var(--mono);font-size:10px;color:var(--text);font-weight:700;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strat-card .sc-sig{font-family:var(--mono);font-size:16px;font-weight:900}
+.strat-card .sc-sig.CALL{color:var(--green)}.strat-card .sc-sig.PUT{color:var(--red)}.strat-card .sc-sig.WAIT,.strat-card .sc-sig.NEUTRAL{color:var(--amber)}
+.strat-card .sc-meta{font-family:var(--mono);font-size:8.5px;color:var(--muted);margin-top:4px;line-height:1.5}
+.empty-note{font-family:var(--mono);font-size:9.5px;color:var(--muted);padding:8px}
 </style>
 </head>
 <body>
@@ -308,6 +323,8 @@ button{user-select:none;cursor:pointer}
         <div class="sp-tab" onclick="setSPTab('spTgPane')">TELEGRAM</div>
         <div class="sp-tab" onclick="setSPTab('spWatchPane')">WATCHLIST</div>
         <div class="sp-tab" onclick="setSPTab('spMt5Pane')">MT5</div>
+        <div class="sp-tab" onclick="setSPTab('spAccountPane')">ACCOUNT</div>
+        <div class="sp-tab" onclick="setSPTab('spStrategiesPane')">STRATEGIES</div>
       </div>
       <div class="sig-panel-actions">
         <button class="sp-btn" onclick="setSPHeight(220)">▲ EXPAND</button>
@@ -471,6 +488,46 @@ button{user-select:none;cursor:pointer}
           <div class="sp-section" style="margin-top:8px">สถานะล่าสุด</div>
           <div id="mt5LastSignalInfo" style="font-family:var(--mono);font-size:9.5px;color:var(--muted)">ยังไม่มีสัญญาณส่งไป MT5</div>
           <div class="sp-btnrow"><button class="btn blue" onclick="mt5SendTestSignal()">ส่งสัญญาณทดสอบ</button></div>
+        </div>
+      </div>
+      <div class="sp-pane" id="spAccountPane">
+        <div class="sp-tg">
+          <div class="sp-row">
+            <label>สถานะ</label>
+            <span class="status-pill" id="acctFetchPill">ยังไม่ได้ดึงข้อมูล</span>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--muted)">อัปเดตล่าสุด: <b id="acctUpdatedAt" style="color:var(--text)">—</b></span>
+            <button class="btn blue" onclick="fetchAccountStatus()">รีเฟรชตอนนี้</button>
+          </div>
+          <div class="sp-mini-note">ข้อมูลนี้มาจาก MT5 EA ที่ push เข้า <code>/api/account</code> ทุก 5-10 วินาที (ดึงผ่าน MT5 API URL เดียวกับแท็บ MT5)</div>
+          <div class="acct-grid" id="acctKpis">
+            <div class="acct-kpi"><label>BALANCE</label><span id="acctBalance">—</span></div>
+            <div class="acct-kpi"><label>EQUITY</label><span id="acctEquity">—</span></div>
+            <div class="acct-kpi"><label>MARGIN</label><span id="acctMargin">—</span></div>
+            <div class="acct-kpi"><label>FREE MARGIN</label><span id="acctFreeMargin">—</span></div>
+            <div class="acct-kpi"><label>PROFIT</label><span id="acctProfit">—</span></div>
+            <div class="acct-kpi"><label>ACCOUNT</label><span id="acctNumber">—</span></div>
+          </div>
+          <div class="sp-section">POSITIONS</div>
+          <div style="overflow:auto;max-height:140px">
+            <table class="pos-table" id="acctPosTable">
+              <thead><tr><th>SYMBOL</th><th>SIDE</th><th>LOT</th><th>OPEN</th><th>CURRENT</th><th>SL</th><th>TP</th><th>P/L</th></tr></thead>
+              <tbody id="acctPosBody"><tr><td colspan="8" class="empty-note">ยังไม่มีข้อมูล positions</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="sp-pane" id="spStrategiesPane">
+        <div class="sp-tg">
+          <div class="sp-row">
+            <label>สถานะ</label>
+            <span class="status-pill" id="stratFetchPill">ยังไม่ได้ดึงข้อมูล</span>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--muted)">อัปเดตล่าสุด: <b id="stratUpdatedAt" style="color:var(--text)">—</b></span>
+            <button class="btn blue" onclick="fetchStrategies()">รีเฟรชตอนนี้</button>
+          </div>
+          <div class="sp-mini-note">คะแนนกลยุทธ์จาก EA ที่ push เข้า <code>/api/strategies</code> — ใช้ดูภาพรวมว่ากลยุทธ์ไหนกำลังให้สัญญาณอะไร</div>
+          <div class="strat-grid" id="stratGrid">
+            <div class="empty-note">ยังไม่มีข้อมูลกลยุทธ์ — กดรีเฟรช หรือรอ EA push เข้ามา</div>
+          </div>
         </div>
       </div>
     </div>
@@ -773,8 +830,11 @@ function renderSPLog(){
 }
 let spCollapsed=false;
 function setSPTab(paneId){
-  document.querySelectorAll('.sp-tab').forEach((t,i)=>{const tabs=['spOverview','spLog','spApiPane','spTgPane','spWatchPane','spMt5Pane'];t.classList.toggle('active',tabs[i]===paneId)});
+  const tabs=['spOverview','spLog','spApiPane','spTgPane','spWatchPane','spMt5Pane','spAccountPane','spStrategiesPane'];
+  document.querySelectorAll('.sp-tab').forEach((t,i)=>{t.classList.toggle('active',tabs[i]===paneId)});
   document.querySelectorAll('.sp-pane').forEach(p=>p.classList.toggle('active',p.id===paneId));
+  if(paneId==='spAccountPane')fetchAccountStatus();
+  if(paneId==='spStrategiesPane')fetchStrategies();
 }
 function toggleCollapse(){spCollapsed=!spCollapsed;const wrap=qs('sigPanel');const btn=qs('collapseBtn');wrap.classList.toggle('collapsed',spCollapsed);btn.textContent=spCollapsed?'▲ SHOW':'▼ HIDE';}
 function setSPHeight(h){if(spCollapsed){spCollapsed=false;qs('sigPanel').classList.remove('collapsed');qs('collapseBtn').textContent='▼ HIDE';}qs('sigPanel').style.height=h+'px';}
@@ -1529,6 +1589,122 @@ function mt5SendTestSignal(){
   sendSignalToMt5(sym,'HIGHER',fakePrice,2.4);
 }
 
+/* ══════════════════════════════════════════════════════
+   SECTION G: ACCOUNT STATUS PANEL (via /api/account on Neon)
+   ══════════════════════════════════════════════════════ */
+function setAcctPill(text,kind){
+  const p=qs('acctFetchPill');if(!p)return;
+  p.textContent=text;p.className='status-pill'+(kind==='on'?' on':'');
+}
+function fmtMoney(v,ccy){
+  const n=Number(v);
+  if(!Number.isFinite(n))return '—';
+  return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+(ccy?(' '+ccy):'');
+}
+function renderAccountStatus(payload){
+  const acc=(payload&&payload.account)||null;
+  const positions=(payload&&Array.isArray(payload.positions))?payload.positions:[];
+  const ccy=acc&&acc.currency?acc.currency:'';
+  qs('acctBalance').textContent=acc?fmtMoney(acc.balance,ccy):'—';
+  qs('acctEquity').textContent=acc?fmtMoney(acc.equity,ccy):'—';
+  qs('acctMargin').textContent=acc?fmtMoney(acc.margin,ccy):'—';
+  qs('acctFreeMargin').textContent=acc?fmtMoney(acc.freeMargin??acc.free_margin,ccy):'—';
+  const profitEl=qs('acctProfit');
+  if(acc&&Number.isFinite(Number(acc.profit))){
+    const p=Number(acc.profit);
+    profitEl.textContent=(p>=0?'+':'')+fmtMoney(p,ccy);
+    profitEl.className=p>=0?'up':'dn';
+  }else{profitEl.textContent='—';profitEl.className='';}
+  qs('acctNumber').textContent=acc?(acc.login||acc.account||acc.id||'—'):'—';
+
+  const tbody=qs('acctPosBody');
+  if(!positions.length){
+    tbody.innerHTML='<tr><td colspan="8" class="empty-note">ไม่มี positions ที่เปิดอยู่</td></tr>';
+  }else{
+    tbody.innerHTML=positions.map(p=>{
+      const side=String(p.side||p.type||'').toUpperCase();
+      const sideCls=side==='BUY'||side==='CALL'?'up':side==='SELL'||side==='PUT'?'dn':'';
+      const pnl=Number(p.profit??p.pnl);
+      const pnlCls=Number.isFinite(pnl)?(pnl>=0?'up':'dn'):'';
+      return '<tr>'+
+        '<td>'+escapeHtml(p.symbol||'—')+'</td>'+
+        '<td class="'+sideCls+'">'+escapeHtml(side||'—')+'</td>'+
+        '<td>'+(Number.isFinite(Number(p.lot))?Number(p.lot):'—')+'</td>'+
+        '<td>'+fmt(p.openPrice??p.open_price,4)+'</td>'+
+        '<td>'+fmt(p.currentPrice??p.current_price,4)+'</td>'+
+        '<td>'+fmt(p.sl,4)+'</td>'+
+        '<td>'+fmt(p.tp,4)+'</td>'+
+        '<td class="'+pnlCls+'">'+(Number.isFinite(pnl)?((pnl>=0?'+':'')+pnl.toFixed(2)):'—')+'</td>'+
+        '</tr>';
+    }).join('');
+  }
+  qs('acctUpdatedAt').textContent=payload&&payload.updatedAt?timeLabel(payload.updatedAt):'—';
+}
+async function fetchAccountStatus(){
+  setAcctPill('กำลังดึงข้อมูล...');
+  try{
+    const res=await fetch(mt5ApiBaseUrl+'/api/account');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    renderAccountStatus(data);
+    setAcctPill('เชื่อมต่อแล้ว','on');
+  }catch(e){
+    setAcctPill('ดึงข้อมูลไม่สำเร็จ');
+    console.error('ACCOUNT FETCH ERROR >>>',e.message);
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   SECTION H: STRATEGY INTELLIGENCE PANEL (via /api/strategies on Neon)
+   ══════════════════════════════════════════════════════ */
+function setStratPill(text,kind){
+  const p=qs('stratFetchPill');if(!p)return;
+  p.textContent=text;p.className='status-pill'+(kind==='on'?' on':'');
+}
+function renderStrategies(payload){
+  const list=(payload&&Array.isArray(payload.strategies))?payload.strategies:[];
+  const grid=qs('stratGrid');
+  if(!list.length){
+    grid.innerHTML='<div class="empty-note">ยังไม่มีข้อมูลกลยุทธ์ — รอ EA push เข้ามา</div>';
+  }else{
+    grid.innerHTML=list.map(s=>{
+      const sig=sigClass(s.signal);
+      return '<div class="strat-card">'+
+        '<div class="sc-name">'+escapeHtml(s.name||s.symbol||'—')+'</div>'+
+        '<div class="sc-sig '+sig+'">'+sig+'</div>'+
+        '<div class="sc-meta">'+
+          'Score: <b style="color:var(--text)">'+fmt(s.score,2)+'</b><br>'+
+          'Conf: <b style="color:var(--text)">'+(Number.isFinite(Number(s.confidence))?Math.round(Number(s.confidence))+'%':'—')+'</b><br>'+
+          (s.winRate!=null?('Win Rate: <b style="color:var(--text)">'+fmt(s.winRate,1)+'%</b>'):'')+
+        '</div>'+
+        '</div>';
+    }).join('');
+  }
+  qs('stratUpdatedAt').textContent=payload&&payload.updatedAt?timeLabel(payload.updatedAt):'—';
+}
+async function fetchStrategies(){
+  setStratPill('กำลังดึงข้อมูล...');
+  try{
+    const res=await fetch(mt5ApiBaseUrl+'/api/strategies');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    renderStrategies(data);
+    setStratPill('เชื่อมต่อแล้ว','on');
+  }catch(e){
+    setStratPill('ดึงข้อมูลไม่สำเร็จ');
+    console.error('STRATEGIES FETCH ERROR >>>',e.message);
+  }
+}
+
+let acctPollTimer=null,stratPollTimer=null;
+function startStatusPolling(){
+  if(acctPollTimer)clearInterval(acctPollTimer);
+  if(stratPollTimer)clearInterval(stratPollTimer);
+  fetchAccountStatus();fetchStrategies();
+  acctPollTimer=setInterval(fetchAccountStatus,8000);
+  stratPollTimer=setInterval(fetchStrategies,8000);
+}
+
 function bootApp(){
   initResize();initTg();buildTabs();qs('symbolInput').value=active.tv;
   loadTradingView(active.tv,'1');render();
@@ -1536,6 +1712,7 @@ function bootApp(){
   renderTrackRecord();renderGlobalKpis();renderVirtualBalance();renderWatchPicker();refreshCooldownLabel();
   loadDailyStats();lastTrackedDayKey=todayKey();
   loadMt5Config();mt5InitUiFromConfig();
+  startStatusPolling();
   setInterval(checkDailyRollover,60000);
   // ไม่เรียก connectApiWS() ที่นี่ — รอผู้ใช้กด "เชื่อมต่อพอร์ต"
   const initData=valueFor(active);if(initData)render();
