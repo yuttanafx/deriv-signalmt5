@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th"> 
+<html lang="th">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -464,6 +464,7 @@ button{user-select:none;cursor:pointer}
           <div class="sp-row"><label>RR Ratio</label><input type="number" id="mt5RrInput" value="2" min="0.1" step="0.1" style="max-width:70px" onchange="mt5RrChanged(this.value)"><span style="font-family:var(--mono);font-size:9px;color:var(--muted)">เช่น 2 = TP ไกลกว่า SL 2 เท่า</span></div>
           <div class="sp-row"><label>SL × ATR</label><input type="number" id="mt5SlAtrInput" value="1.5" min="0.1" step="0.1" style="max-width:70px" onchange="mt5SlAtrChanged(this.value)"><span style="font-family:var(--mono);font-size:9px;color:var(--muted)">ระยะ SL = ATR คูณค่านี้</span></div>
           <div class="sp-row"><label>Lot Size</label><input type="number" id="mt5LotInput" value="0.01" min="0.01" step="0.01" style="max-width:70px" onchange="mt5LotChanged(this.value)"></div>
+          <div class="sp-row"><label>API URL</label><input type="text" id="mt5ApiBaseInput" value="https://deriv-mt5signal.vercel.app" onchange="mt5ApiBaseUrlChanged(this.value)" style="min-width:220px"></div>
           <div class="sp-section" style="margin-top:8px">แมป Symbol → ชื่อใน MT5</div>
           <div id="mt5SymbolMapList" style="font-family:var(--mono);font-size:9.5px"></div>
           <div class="sp-mini-note warn" style="margin-top:8px">ชื่อ Symbol ใน MT5 ต้องตรงกับที่เห็นใน Market Watch ของโบรกเกอร์คุณเป๊ะ (เช่น "Volatility 75 Index") ไม่งั้น EA จะเปิดออเดอร์ไม่ได้</div>
@@ -538,12 +539,10 @@ plotshape(signal=="PUT",style=shape.labeldown,location=location.abovebar,color=c
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 const firebaseConfig={apiKey:"AIzaSyBdcAy8tLMZ3jeGcPGOdbR7qF9DDh0Uidc",authDomain:"deriv-signal3.firebaseapp.com",projectId:"deriv-signal3",storageBucket:"deriv-signal3.firebasestorage.app",messagingSenderId:"1047757017057",appId:"1:1047757017057:web:02cb845e7f8fc345988ca0",measurementId:"G-ZV32T1XVJC"};
 firebase.initializeApp(firebaseConfig);
 const fbAuth=firebase.auth();
-const fbDb=firebase.firestore();
 const loginOverlayEl=document.getElementById('loginOverlay');
 const appRootEl=document.getElementById('appRoot');
 const loginEmailEl=document.getElementById('loginEmail');
@@ -1442,11 +1441,11 @@ async function sendTodaySummaryNow(){await notifyTelegramDailySummary(todayKey()
    SECTION E: INIT
    ══════════════════════════════════════════════════════ */
 /* ══════════════════════════════════════════════════════
-   SECTION F: MT5 SIGNAL BRIDGE (via Firestore)
+   SECTION F: MT5 SIGNAL BRIDGE (via Vercel /api/orders + Neon)
    ══════════════════════════════════════════════════════ */
 let mt5Enabled=false,mt5RrRatio=2,mt5SlAtrMult=1.5,mt5LotSize=0.01;
 let mt5SymbolMap={};
-let mt5SignalCounter=0;
+let mt5ApiBaseUrl='https://deriv-mt5signal.vercel.app';
 
 function loadMt5Config(){
   try{
@@ -1454,10 +1453,11 @@ function loadMt5Config(){
     mt5Enabled=!!cfg.enabled;mt5RrRatio=Number.isFinite(cfg.rr)?cfg.rr:2;
     mt5SlAtrMult=Number.isFinite(cfg.slAtr)?cfg.slAtr:1.5;mt5LotSize=Number.isFinite(cfg.lot)?cfg.lot:0.01;
     mt5SymbolMap=cfg.symbolMap||{};
+    mt5ApiBaseUrl=cfg.apiBaseUrl||'https://deriv-mt5signal.vercel.app';
   }catch(e){}
 }
 function saveMt5Config(){
-  try{localStorage.setItem('v36Mt5Config',JSON.stringify({enabled:mt5Enabled,rr:mt5RrRatio,slAtr:mt5SlAtrMult,lot:mt5LotSize,symbolMap:mt5SymbolMap}));}catch(e){}
+  try{localStorage.setItem('v36Mt5Config',JSON.stringify({enabled:mt5Enabled,rr:mt5RrRatio,slAtr:mt5SlAtrMult,lot:mt5LotSize,symbolMap:mt5SymbolMap,apiBaseUrl:mt5ApiBaseUrl}));}catch(e){}
 }
 function mt5ToggleEnabled(checked){
   mt5Enabled=checked;
@@ -1467,6 +1467,7 @@ function mt5ToggleEnabled(checked){
 function mt5RrChanged(v){const n=parseFloat(v);if(Number.isFinite(n)&&n>0)mt5RrRatio=n;saveMt5Config();}
 function mt5SlAtrChanged(v){const n=parseFloat(v);if(Number.isFinite(n)&&n>0)mt5SlAtrMult=n;saveMt5Config();}
 function mt5LotChanged(v){const n=parseFloat(v);if(Number.isFinite(n)&&n>0)mt5LotSize=n;saveMt5Config();}
+function mt5ApiBaseUrlChanged(v){mt5ApiBaseUrl=(v||'').trim().replace(/\/$/,'');saveMt5Config();}
 function mt5SymbolInputChanged(derivSym,val){mt5SymbolMap[derivSym]=val.trim();saveMt5Config();}
 function renderMt5SymbolMap(){
   const el=qs('mt5SymbolMapList');if(!el)return;
@@ -1481,12 +1482,12 @@ function mt5InitUiFromConfig(){
   const rr=qs('mt5RrInput');if(rr)rr.value=mt5RrRatio;
   const sa=qs('mt5SlAtrInput');if(sa)sa.value=mt5SlAtrMult;
   const lt=qs('mt5LotInput');if(lt)lt.value=mt5LotSize;
+  const ab=qs('mt5ApiBaseInput');if(ab)ab.value=mt5ApiBaseUrl;
   renderMt5SymbolMap();
 }
 
 async function sendSignalToMt5(derivSymbol,direction,entryPrice,atrValue){
   if(!mt5Enabled)return;
-  if(!fbDb)return;
   const mt5Symbol=(mt5SymbolMap[derivSymbol]||'').trim();
   if(!mt5Symbol){console.warn('MT5: ไม่ได้ตั้งชื่อ symbol สำหรับ',derivSymbol,'— ข้ามการส่งสัญญาณ');return;}
   const slDist=(Number.isFinite(atrValue)&&atrValue>0)?atrValue*mt5SlAtrMult:0;
@@ -1494,27 +1495,19 @@ async function sendSignalToMt5(derivSymbol,direction,entryPrice,atrValue){
   const isBuy=direction==='HIGHER';
   const sl=isBuy?(entryPrice-slDist):(entryPrice+slDist);
   const tp=isBuy?(entryPrice+slDist*mt5RrRatio):(entryPrice-slDist*mt5RrRatio);
-  mt5SignalCounter++;
-  const payload={
-    id:Date.now()+'-'+mt5SignalCounter,
-    symbol:derivSymbol,
-    mt5_symbol:mt5Symbol,
-    direction:isBuy?'BUY':'SELL',
-    entry:entryPrice,
-    sl:sl,
-    tp:tp,
-    rr:mt5RrRatio,
-    lot:mt5LotSize,
-    ts:Date.now()
-  };
+  const payload={side:isBuy?'BUY':'SELL',symbol:mt5Symbol,lot:mt5LotSize,sl:sl,tp:tp,strategy:derivSymbol+' RR'+mt5RrRatio};
   try{
-    await fbDb.collection('mt5_signals').doc('latest').set(payload);
+    const res=await fetch(mt5ApiBaseUrl+'/api/orders',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error((data&&data.error)||('HTTP '+res.status));
     const info=qs('mt5LastSignalInfo');
-    if(info)info.innerHTML='<b style="color:'+(isBuy?'var(--green)':'var(--red)')+'">'+payload.direction+'</b> '+escapeHtml(mt5Symbol)+' @ '+fmt(entryPrice,4)+' | SL '+fmt(sl,4)+' TP '+fmt(tp,4)+' | '+new Date().toLocaleTimeString('th-TH',{hour12:false});
+    if(info)info.innerHTML='<b style="color:'+(isBuy?'var(--green)':'var(--red)')+'">'+payload.side+'</b> '+escapeHtml(mt5Symbol)+' @ '+fmt(entryPrice,4)+' | SL '+fmt(sl,4)+' TP '+fmt(tp,4)+' | ส่งเข้าคิวแล้ว ('+new Date().toLocaleTimeString('th-TH',{hour12:false})+')';
   }catch(e){
     console.error('MT5 SIGNAL SEND ERROR >>>',e.message);
     const info=qs('mt5LastSignalInfo');
-    if(info)info.innerHTML='<span style="color:var(--red)">ส่งไม่สำเร็จ: '+escapeHtml(e.message)+' (เช็ค Firestore rules / เปิดใช้งาน Firestore แล้วหรือยัง)</span>';
+    if(info)info.innerHTML='<span style="color:var(--red)">ส่งไม่สำเร็จ: '+escapeHtml(e.message)+' (เช็ค URL API / CORS / deploy)</span>';
   }
 }
 
