@@ -1,0 +1,16 @@
+{
+  "name": "deriv-signalmt5",
+  "version": "1.0.0",
+  "description": "MT5 Signal Receiver Backend",
+  "main": "api/orders.js",
+  "type": "module",
+  "scripts": {
+    "start": "node api/orders.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
